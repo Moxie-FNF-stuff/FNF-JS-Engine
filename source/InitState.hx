@@ -27,8 +27,6 @@ class InitState extends FlxState {
 		trace('save status: ${FlxG.save.status}');
 		#end
 
-		FlxG.fixedTimestep = false;
-
 		PlayerSettings.init();
 
         // ClientPrefs.loadDefaultKeys();

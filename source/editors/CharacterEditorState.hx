@@ -14,17 +14,12 @@ import flixel.addons.ui.FlxUITooltip.FlxUITooltipStyle;
 import flixel.animation.FlxAnimation;
 import flixel.graphics.FlxGraphic;
 import flixel.input.keyboard.FlxKey;
-import flixel.system.debug.interaction.tools.Pointer.GraphicCursorCross;
 import flixel.ui.FlxButton;
 import flixel.ui.FlxSpriteButton;
 import lime.system.Clipboard;
 import openfl.events.Event;
 import openfl.events.IOErrorEvent;
 import openfl.net.FileReference;
-
-#if MODS_ALLOWED
-#end
-
 
 /**
 	*DEBUG MODE
@@ -103,8 +98,9 @@ class CharacterEditorState extends MusicBeatState
 		ghostLayer = new FlxTypedGroup<FlxSprite>();
 		add(ghostLayer);
 
-		cameraFollowPointer = new FlxSprite().loadGraphic(FlxGraphic.fromClass(GraphicCursorCross));
+		cameraFollowPointer = new FlxSprite().loadGraphic(Paths.image('cursorCross'));
 		cameraFollowPointer.setGraphicSize(40, 40);
+		cameraFollowPointer.antialiasing = false;
 		cameraFollowPointer.updateHitbox();
 		add(cameraFollowPointer);
 

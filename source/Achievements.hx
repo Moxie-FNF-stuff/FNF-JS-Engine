@@ -140,7 +140,7 @@ class Achievements {
 		achievementsUnlocked.push(name);
 
 		// earrape prevention
-		var time:Int = openfl.Lib.getTimer();
+		var time:Int = Std.int(openfl.Lib.getTimer());
 		if(Math.abs(time - _lastUnlock) >= 100) //If last unlocked happened in less than 100 ms (0.1s) ago, then don't play sound
 		{
 			FlxG.sound.play(Paths.sound('confirmMenu'), 0.5);

@@ -5,7 +5,6 @@ import Conductor.BPMChangeEvent;
 import Section.SwagSection;
 import Song.SwagSong;
 import flixel.addons.ui.FlxInputText;
-import flixel.addons.ui.FlxUI9SliceSprite;
 import flixel.addons.ui.FlxUI;
 import flixel.addons.ui.FlxUICheckBox;
 import flixel.addons.ui.FlxUIInputText;
@@ -20,8 +19,6 @@ import flixel.util.FlxSort;
 import haxe.format.JsonParser;
 import haxe.io.Bytes;
 import lime.media.AudioBuffer;
-import lime.ui.FileDialog;
-import lime.ui.FileDialogType;
 import openfl.Lib;
 import openfl.events.Event;
 import openfl.events.IOErrorEvent;
@@ -931,36 +928,58 @@ class ChartingState extends MusicBeatState
       "JS Engine Anti-Crash Tool");
   }
 
-  function promptBackup()
-  {
-    var fD:FileDialog = new FileDialog();
+	function promptBackup()
+	{
+		var fileRef:FileReference = new FileReference();
 
-    fD.onOpen.add(f -> {
-      // Kinda stupid but it works
-      openSubState(new Prompt('This action will clear current progress.\n\nProceed?', 0, function() {
-        try
-        {
-          var wrapper:SwagSong = Song.parseJSON(f);
-          if (wrapper.song == null)
-          {
-            CoolUtil.coolError("Failed to load JSON – not a valid chart.json.", "JS Engine Anti-Crash Tool");
-            return;
-          }
+		fileRef.addEventListener(Event.SELECT, function(_)
+		{
+			openSubState(new Prompt('This action will clear current progress.\n\nProceed?', 0, function()
+			{
+				try
+				{
+					fileRef.addEventListener(Event.COMPLETE, function(_)
+					{
+						try
+						{
+							var data:String = fileRef.data.readUTFBytes(fileRef.data.length);
 
-          PlayState.SONG = wrapper;
-          CoolUtil.currentDifficulty = "backup";
+							var wrapper:SwagSong = Song.parseJSON(data);
 
-          FlxG.resetState();
-        }
-        catch (e)
-        {
-          CoolUtil.coolError('Failed to load JSON, is it a character.json or a stage.json instead of a chart.json?\nError: $e', "JS Engine Anti-Crash Tool");
-        };
-      }, null, ignoreWarnings));
-    });
+							if (wrapper.song == null)
+							{
+								CoolUtil.coolError("Failed to load JSON – not a valid chart.json.", "JS Engine Anti-Crash Tool");
+								return;
+							}
 
-    fD.open("json", null, "Choose a Psych Engine Compatible Chart JSON to load as.");
-  }
+							PlayState.SONG = wrapper;
+							CoolUtil.currentDifficulty = "backup";
+
+							FlxG.resetState();
+						}
+						catch (e)
+						{
+							CoolUtil.coolError('Failed to load JSON, is it a character.json or a stage.json instead of a chart.json?\nError: $e', "JS Engine Anti-Crash Tool");
+						}
+					});
+
+					fileRef.load();
+				}
+				catch (e)
+				{
+					CoolUtil.coolError('Failed to load JSON.\nError: $e', "JS Engine Anti-Crash Tool");
+				}
+			}, null, ignoreWarnings));
+		});
+
+		fileRef.addEventListener(IOErrorEvent.IO_ERROR, function(e)
+		{
+			CoolUtil.coolError('File load error: $e', "JS Engine Anti-Crash Tool");
+		});
+
+		// Optional filter for JSON files
+		fileRef.browse();
+	}
 
   var gameOverCharacterInputText:FlxUIInputText;
   var gameOverSoundInputText:FlxUIInputText;
