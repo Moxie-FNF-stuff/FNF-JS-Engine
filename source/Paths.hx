@@ -15,8 +15,6 @@ import openfl.system.System;
 import openfl.utils.AssetType;
 #if cpp
 import cpp.vm.Gc;
-#elseif hl
-import hl.Gc;
 #end
 
 @:access(openfl.display.BitmapData)
@@ -154,17 +152,6 @@ class Paths
     splashConfigs.set(skin, config);
     return config;
   }
-
-  public static function excludeAsset(key:String)
-  {
-    if (!dumpExclusions.contains(key)) dumpExclusions.push(key);
-  }
-
-  public static var dumpExclusions:Array<String> = [
-    'assets/music/freakyMenu.$SOUND_EXT',
-    'assets/shared/music/breakfast.$SOUND_EXT',
-    'assets/shared/music/tea-time.$SOUND_EXT',
-  ];
   
   public static var pixelReadExclusions:Array<String> = ['images/noteColorMenu/palette.png'];
 
@@ -172,8 +159,6 @@ class Paths
   {
     #if cpp
     Gc.run(major);
-    #elseif hl
-    Gc.major();
     #end
   }
 
@@ -181,8 +166,6 @@ class Paths
   {
     #if cpp
     Gc.compact();
-    #elseif hl
-    Gc.major();
     #end
   }
 
@@ -192,51 +175,20 @@ class Paths
       _gc(major);
   }
 
-  /// haya I love you for the base cache dump I took to the max
-  public static function clearUnusedMemory()
-  {
-    // clear non local assets in the tracked assets list
-    for (key in currentTrackedAssets.keys())
-    {
-      // if it is not currently contained within the used local assets
-      if (!localTrackedAssets.contains(key) && !dumpExclusions.contains(key))
-      {
-        destroyGraphic(currentTrackedAssets.get(key)); // get rid of the graphic
-        currentTrackedAssets.remove(key); // and remove the key from local cache map
-      }
-    }
-    // run the garbage collector for good measure lmfao
-    compress();
-    gc(true);
-  }
+	public static function excludeAsset(key:String):Void
+	  FunkinMemory.exclude(key);
 
-  // define the locally tracked assets
-  public static var localTrackedAssets:Array<String> = [];
+	public static function clearStoredMemory(?cleanUnused:Bool = false):Void
+	{
+	  FunkinMemory.preparePurge();
+	  if (cleanUnused) clearUnusedMemory();
+	}
 
-  @:access(flixel.system.frontEnds.BitmapFrontEnd._cache)
-  public static function clearStoredMemory(?cleanUnused:Bool = false)
-  {
-    // clear anything not in the tracked assets list
-    for (key in FlxG.bitmap._cache.keys())
-    {
-      if (!currentTrackedAssets.exists(key)) destroyGraphic(FlxG.bitmap.get(key));
-    }
-    // clear all sounds that are cached
-    for (key in currentTrackedSounds.keys())
-    {
-      if (!localTrackedAssets.contains(key) && !dumpExclusions.contains(key) && key != null)
-      {
-        // trace('test: ' + dumpExclusions, key);
-        Assets.cache.clear(key);
-        currentTrackedSounds.remove(key);
-      }
-    }
-    // flags everything to be cleared out next unused memory clear
-    localTrackedAssets = [];
-    #if !html5 openfl.Assets.cache.clear("songs"); #end
-    gc(true);
-    compress();
-  }
+	public static function clearUnusedMemory():Void
+	{
+	  FunkinMemory.purgeUnused();
+	  gc(true);
+	}
 
   inline static function destroyGraphic(graphic:FlxGraphic)
   {
@@ -402,7 +354,7 @@ class Paths
   // Sound loading.
   static public function sound(key:String, ?library:String):Sound
   {
-    var sound:Sound = returnSound('sounds', key, library);
+    final sound:Sound = returnSound('sounds', key, library);
     return sound;
   }
 
@@ -424,9 +376,6 @@ class Paths
   {
     var formattedDifficulty:String = formatToSongPath(difficulty);
     if (difficulty.contains(' ')) difficulty = formattedDifficulty;
-    #if html5
-    return 'songs:assets/songs/${formatToSongPath(song)}/Voices.$SOUND_EXT';
-    #else
     if (difficulty != null)
     {
       var songKey:String = '${formatToSongPath(song)}/Voices';
@@ -443,7 +392,6 @@ class Paths
     if (postfix != null) songKey += '-' + postfix;
     var voices = returnSound('songs', songKey);
     return voices;
-    #end
   }
 
   // Loads the instrumental. Crucial for generateSong
@@ -451,9 +399,6 @@ class Paths
   {
     var formattedDifficulty:String = formatToSongPath(difficulty);
     if (difficulty.contains(' ')) difficulty = formattedDifficulty;
-    #if html5
-    return 'songs:assets/songs/${formatToSongPath(song)}/Inst.$SOUND_EXT';
-    #else
     if (difficulty != null)
     {
       var songKey:String = '${formatToSongPath(song)}/Inst-$difficulty';
@@ -467,7 +412,6 @@ class Paths
     var songKey:String = '${formatToSongPath(song)}/Inst';
     var inst = returnSound('songs', songKey);
     return inst;
-    #end
   }
 
   static public function playMenuMusic(force:Bool = false, volume:Float = 1):Void
@@ -523,33 +467,48 @@ class Paths
 
   static public function image(key:String, ?parentFolder:String = null):FlxGraphic
   {
-    key = 'images/$key' + '.png';
-    var bitmap:BitmapData = null;
-    if (currentTrackedAssets.exists(key))
-    {
-      localTrackedAssets.push(key);
-      return currentTrackedAssets.get(key);
-    }
-    return cacheBitmap(key, parentFolder, bitmap);
+	  var bitmap:BitmapData = null;
+	  var file:String = null;
+	  var cached:FlxGraphic = null;
+
+	  #if MODS_ALLOWED
+	  file = modsImages(key);
+	  cached = FunkinMemory.getTexture(file);
+	  if (cached != null) return cached;
+	  if (FileSystem.exists(file)) bitmap = BitmapData.fromFile(file);
+	  else
+	  #end
+	  {
+		file = getPath('images/$key.png', IMAGE, parentFolder);
+		cached = FunkinMemory.getTexture(file);
+		if (cached != null) return cached;
+		if (OpenFlAssets.exists(file, IMAGE)) bitmap = OpenFlAssets.getBitmapData(file);
+	  }
+    return cacheBitmap(key, parentFolder, bitmap, file);
   }
 
-  public static function cacheBitmap(key:String, ?parentFolder:String = null, ?bitmap:BitmapData):FlxGraphic
+  public static function cacheBitmap(key:String, ?parentFolder:String = null, ?bitmap:BitmapData, ?cacheKey:String):FlxGraphic
   {
     if (bitmap == null)
     {
       final file:String = getPath(key, IMAGE, parentFolder, true);
+
+      final hit:FlxGraphic = FunkinMemory.getTexture(file);
+      if (hit != null) return hit;
+
       #if MODS_ALLOWED if (FileSystem.exists(file)) bitmap = BitmapData.fromFile(file);
       else #end if (OpenFlAssets.exists(file, IMAGE)) bitmap = OpenFlAssets.getBitmapData(file);
 
       if (bitmap == null)
       {
- 		if (!warnedMissingAssets.exists(file))
-		{
-			warnedMissingAssets.set(file, true);
-			trace('oh no its returning null NOOOO ($file)');
-		}
-		return null;
+        if (!warnedMissingAssets.exists(file))
+        {
+          warnedMissingAssets.set(file, true);
+          trace('oh no its returning null NOOOO ($file)');
+        }
+        return null;
       }
+      cacheKey = file; // this path is the one actually loaded from
     }
 
     if (ClientPrefs.cacheOnGPU && bitmap.image != null && !pixelReadExclusions.contains(key))
@@ -567,12 +526,11 @@ class Paths
       bitmap.readable = true;
     }
 
-    final graph:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, key);
+    final storeKey:String = cacheKey ?? key;
+    final graph:FlxGraphic = FlxGraphic.fromBitmapData(bitmap, false, storeKey);
     graph.persist = true;
     graph.destroyOnNoUse = false;
-
-    currentTrackedAssets.set(key, graph);
-    localTrackedAssets.push(key);
+    FunkinMemory.storeTexture(storeKey, graph);
     return graph;
   }
 
@@ -781,68 +739,40 @@ class Paths
   public static var currentTrackedSounds:Map<String, Sound> = [];
 
   // Returns sounds which is useful for all the sfx
-  public static function returnSound(path:String, key:String, ?library:String, stream:Bool = false)
-  {
-    var sound:Sound = null;
-    var file:String = null;
+	public static function returnSound(path:String, key:String, ?library:String):Sound
+	{
+	  var sound:Sound = null;
 
-    #if MODS_ALLOWED
-    file = modsSounds(path, key);
-    if (currentTrackedSounds.exists(file))
-    {
-      localTrackedAssets.push(file);
-      return currentTrackedSounds.get(file);
-    } else if (FileSystem.exists(file))
-    {
-      #if lime_vorbis
-      if (stream) sound = Sound.fromAudioBuffer(AudioBuffer.fromVorbisFile(VorbisFile.fromFile(file)));
-      else
-      #end
-      try
-      {
-        final header:Bytes = File.getBytes(file).sub(0, 4);
-        if (header.toString() != "OggS" && file != null)
-        {
-          throw 'The file "$file" is not a valid OGG file (missing OggS header). It may have been renamed from another format like MP3.';
-        }
+	  #if MODS_ALLOWED
+	  var file:String = modsSounds(path, key);
+	  if (FileSystem.exists(file))
+	  {
+		sound = FunkinMemory.getSound(file);
+		if (sound == null)
+		{
+		  sound = Sound.fromFile(file);
+		  FunkinMemory.storeSound(file, sound);
+		}
+		return sound;
+	  }
+	  #end
 
-        sound = Sound.fromFile(file);
-      }
-      catch (e)
-      {
-        throw 'Cannot load sound file: $file\nMake sure it is a properly encoded .ogg file.\nError: $e';
-      }
-    } else
-    #end
-    {
-      // I hate this so god damn much
-      var gottenPath:String = getPath('$path/$key.$SOUND_EXT', SOUND, library);
-      file = gottenPath.substring(gottenPath.indexOf(':') + 1, gottenPath.length);
-      if (path == 'songs') gottenPath = 'songs:' + gottenPath;
-      if (currentTrackedSounds.exists(file))
-      {
-        localTrackedAssets.push(file);
-        return currentTrackedSounds.get(file);
-      } else if (OpenFlAssets.exists(gottenPath, SOUND))
-      {
-        #if lime_vorbis
-        if (stream) sound = OpenFlAssets.getMusic(gottenPath);
-        else
-        #end
-        sound = OpenFlAssets.getSound(gottenPath);
-      }
-    }
+	  var gottenPath:String = getPath('$path/$key.$SOUND_EXT', SOUND, library);
+	  gottenPath = gottenPath.substring(gottenPath.indexOf(':') + 1, gottenPath.length);
 
-    if (sound != null)
-    {
-      localTrackedAssets.push(file);
-      currentTrackedSounds.set(file, sound);
-      return sound;
-    }
-
-    trace('oh no its returning null NOOOO ($file)');
-    return null;
-  }
+	  sound = FunkinMemory.getSound(gottenPath);
+	  if (sound == null)
+	  {
+		#if MODS_ALLOWED
+		sound = Sound.fromFile('./' + gottenPath);
+		#else
+		var folder:String = (path == 'songs') ? 'songs:' : '';
+		sound = OpenFlAssets.getSound(folder + getPath('$path/$key.$SOUND_EXT', SOUND, library));
+		#end
+		FunkinMemory.storeSound(gottenPath, sound);
+	  }
+	  return sound;
+	}
 
   #if MODS_ALLOWED
   // Loads mods.

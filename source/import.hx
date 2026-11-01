@@ -54,16 +54,21 @@ import flixel.FlxObject;
 import flixel.util.FlxSave;
 import flixel.util.FlxStringUtil;
 
-//others
+//openfl
 import openfl.display.BitmapData;
 import openfl.net.FileFilter;
 import openfl.geom.Rectangle;
 import openfl.utils.Assets as OpenFlAssets;
+//lime
 import lime.utils.Assets;
+//haxe
 import haxe.Json;
 
 // utils
 import utils.*;
+
+//backend
+import backend.FunkinMemory;
 
 using StringTools;
 #end

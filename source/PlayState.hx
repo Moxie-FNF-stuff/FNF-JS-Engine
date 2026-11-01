@@ -1399,8 +1399,6 @@ class PlayState extends MusicBeatState
 		if(ClientPrefs.hitsoundVolume > 0) Paths.sound('hitsound');
 		hitsound.volume = ClientPrefs.hitsoundVolume;
 		hitsound.pitch = playbackRate;
-		for (i in 1...4) Paths.sound('missnote$i');
-		Paths.image('alphabet');
 
 		if (PauseSubState.songName != null)
 			Paths.music(PauseSubState.songName);

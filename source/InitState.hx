@@ -45,6 +45,8 @@ class InitState extends FlxState {
 		#end
 		// Just to load a mod on start up if ya got one. For mods that change the menu music and bg
 		Mods.loadTopMod();
+		
+		FunkinMemory.initialCache();
 
         // -- -- -- //
 
